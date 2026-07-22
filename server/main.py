@@ -1,10 +1,14 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
+from datetime import datetime, timedelta
 from pydantic import BaseModel
-from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders
+from mock_data import inventory_items, orders, demand_forecasts, backlog_items, spending_summary, monthly_spending, category_spending, recent_transactions, purchase_orders, restock_orders
 
 app = FastAPI(title="Factory Inventory Management System")
+
+# Fixed lead time assumption for all restock orders (no supplier-specific lead time data exists)
+RESTOCK_LEAD_TIME_DAYS = 14
 
 # Quarter mapping for date filtering
 QUARTER_MAP = {
@@ -120,6 +124,45 @@ class CreatePurchaseOrderRequest(BaseModel):
     expected_delivery_date: str
     notes: Optional[str] = None
 
+class RestockRecommendation(BaseModel):
+    item_sku: str
+    item_name: str
+    current_demand: int
+    forecasted_demand: int
+    demand_gap: int
+    unit_cost: float
+    recommended_quantity: int
+    line_total: float
+    fits_budget: bool
+
+class RestockRecommendationResponse(BaseModel):
+    budget: float
+    total_estimated_cost: float
+    remaining_budget: float
+    recommendations: List[RestockRecommendation]
+
+class RestockOrderLineItem(BaseModel):
+    item_sku: str
+    item_name: str
+    quantity: int
+    unit_cost: float
+    line_total: float
+
+class RestockOrder(BaseModel):
+    id: str
+    order_number: str
+    line_items: List[RestockOrderLineItem]
+    total_cost: float
+    supplier: Optional[str] = "General Supplier"
+    status: str
+    created_date: str
+    lead_time_days: int
+    expected_delivery: str
+
+class CreateRestockOrderRequest(BaseModel):
+    line_items: List[RestockOrderLineItem]
+    supplier: Optional[str] = None
+
 # API endpoints
 @app.get("/")
 def root():
@@ -178,6 +221,107 @@ def get_backlog():
         item_dict["has_purchase_order"] = has_po
         result.append(item_dict)
     return result
+
+@app.get("/api/restocking/recommendations", response_model=RestockRecommendationResponse)
+def get_restock_recommendations(budget: float = Query(..., ge=0)):
+    """Recommend items to restock within budget, prioritized by demand gap"""
+    inventory_by_sku = {item["sku"]: item for item in inventory_items}
+
+    candidates = []
+    for forecast in demand_forecasts:
+        gap = forecast["forecasted_demand"] - forecast["current_demand"]
+        if gap <= 0:
+            continue
+        item = inventory_by_sku.get(forecast["item_sku"])
+        if not item:
+            continue
+        candidates.append({
+            "item_sku": forecast["item_sku"],
+            "item_name": forecast["item_name"],
+            "current_demand": forecast["current_demand"],
+            "forecasted_demand": forecast["forecasted_demand"],
+            "demand_gap": gap,
+            "unit_cost": item["unit_cost"]
+        })
+
+    # Prioritize the biggest demand shortfalls first, not the cheapest items
+    candidates.sort(key=lambda c: c["demand_gap"], reverse=True)
+
+    remaining_budget = budget
+    recommendations = []
+    for c in candidates:
+        full_line_cost = c["demand_gap"] * c["unit_cost"]
+        if full_line_cost <= remaining_budget:
+            quantity = c["demand_gap"]
+            fits_budget = True
+        elif c["unit_cost"] <= remaining_budget:
+            quantity = int(remaining_budget // c["unit_cost"])
+            fits_budget = False
+        else:
+            continue
+
+        line_total = round(quantity * c["unit_cost"], 2)
+        remaining_budget = round(remaining_budget - line_total, 2)
+        recommendations.append(RestockRecommendation(
+            item_sku=c["item_sku"],
+            item_name=c["item_name"],
+            current_demand=c["current_demand"],
+            forecasted_demand=c["forecasted_demand"],
+            demand_gap=c["demand_gap"],
+            unit_cost=c["unit_cost"],
+            recommended_quantity=quantity,
+            line_total=line_total,
+            fits_budget=fits_budget
+        ))
+
+    total_estimated_cost = round(budget - remaining_budget, 2)
+    return RestockRecommendationResponse(
+        budget=budget,
+        total_estimated_cost=total_estimated_cost,
+        remaining_budget=remaining_budget,
+        recommendations=recommendations
+    )
+
+@app.post("/api/restocking/orders", response_model=RestockOrder, status_code=201)
+def create_restock_order(request: CreateRestockOrderRequest):
+    """Submit a restock order made up of one or more line items"""
+    if not request.line_items:
+        raise HTTPException(status_code=400, detail="At least one line item is required")
+
+    line_items = []
+    total_cost = 0.0
+    for li in request.line_items:
+        line_total = round(li.quantity * li.unit_cost, 2)
+        total_cost += line_total
+        line_items.append(RestockOrderLineItem(
+            item_sku=li.item_sku,
+            item_name=li.item_name,
+            quantity=li.quantity,
+            unit_cost=li.unit_cost,
+            line_total=line_total
+        ))
+    total_cost = round(total_cost, 2)
+
+    now = datetime.now()
+    order_number = f"RSO-2025-{len(restock_orders) + 1:04d}"
+    order = RestockOrder(
+        id=str(len(restock_orders) + 1),
+        order_number=order_number,
+        line_items=line_items,
+        total_cost=total_cost,
+        supplier=request.supplier or "General Supplier",
+        status="Pending",
+        created_date=now.isoformat(),
+        lead_time_days=RESTOCK_LEAD_TIME_DAYS,
+        expected_delivery=(now + timedelta(days=RESTOCK_LEAD_TIME_DAYS)).isoformat()
+    )
+    restock_orders.append(order.model_dump())
+    return order
+
+@app.get("/api/restocking/orders", response_model=List[RestockOrder])
+def get_restock_orders():
+    """Get all submitted restock orders"""
+    return restock_orders
 
 @app.get("/api/dashboard/summary")
 def get_dashboard_summary(
