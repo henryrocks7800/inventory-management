@@ -30,6 +30,7 @@
           </router-link>
         </nav>
         <LanguageSwitcher />
+        <ThemeToggle />
         <ProfileMenu
           @show-profile-details="showProfileDetails = true"
           @show-tasks="showTasks = true"
@@ -67,6 +68,7 @@ import ProfileMenu from './components/ProfileMenu.vue'
 import ProfileDetailsModal from './components/ProfileDetailsModal.vue'
 import TasksModal from './components/TasksModal.vue'
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
+import ThemeToggle from './components/ThemeToggle.vue'
 
 export default {
   name: 'App',
@@ -75,7 +77,8 @@ export default {
     ProfileMenu,
     ProfileDetailsModal,
     TasksModal,
-    LanguageSwitcher
+    LanguageSwitcher,
+    ThemeToggle
   },
   setup() {
     const { currentUser } = useAuth()
@@ -165,6 +168,43 @@ export default {
 </script>
 
 <style>
+:root,
+:root[data-theme="light"] {
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-border-hover: #cbd5e1;
+  --color-text: #1e293b;
+  --color-text-heading: #0f172a;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #475569;
+  --color-table-row-hover: #f8fafc;
+  --color-thead-bg: #f8fafc;
+  --color-active-bg: #eff6ff;
+  --color-active-text: #2563eb;
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-nav: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-surface-hover: #263548;
+  --color-border: #334155;
+  --color-border-hover: #475569;
+  --color-text: #e2e8f0;
+  --color-text-heading: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #cbd5e1;
+  --color-table-row-hover: #263548;
+  --color-thead-bg: #263548;
+  --color-active-bg: #1e3a5f;
+  --color-active-text: #60a5fa;
+  --shadow-card: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-nav: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -173,10 +213,11 @@ export default {
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  background: #f8fafc;
-  color: #1e293b;
+  background: var(--color-bg);
+  color: var(--color-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .app {
@@ -186,12 +227,13 @@ body {
 }
 
 .top-nav {
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  box-shadow: var(--shadow-nav);
   position: sticky;
   top: 0;
   z-index: 100;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .nav-container {
@@ -221,16 +263,16 @@ body {
 .logo h1 {
   font-size: 1.375rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-heading);
   letter-spacing: -0.025em;
 }
 
 .subtitle {
   font-size: 0.813rem;
-  color: #64748b;
+  color: var(--color-text-secondary);
   font-weight: 400;
   padding-left: 0.75rem;
-  border-left: 1px solid #e2e8f0;
+  border-left: 1px solid var(--color-border);
 }
 
 .nav-tabs {
@@ -240,7 +282,7 @@ body {
 
 .nav-tabs a {
   padding: 0.625rem 1.25rem;
-  color: #64748b;
+  color: var(--color-text-secondary);
   text-decoration: none;
   font-weight: 500;
   font-size: 0.938rem;
@@ -250,13 +292,13 @@ body {
 }
 
 .nav-tabs a:hover {
-  color: #0f172a;
-  background: #f1f5f9;
+  color: var(--color-text-heading);
+  background: var(--color-surface-hover);
 }
 
 .nav-tabs a.active {
-  color: #2563eb;
-  background: #eff6ff;
+  color: var(--color-active-text);
+  background: var(--color-active-bg);
 }
 
 .nav-tabs a.active::after {
@@ -266,7 +308,7 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: #2563eb;
+  background: var(--color-active-text);
 }
 
 .main-content {
@@ -284,13 +326,13 @@ body {
 .page-header h2 {
   font-size: 1.875rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-heading);
   margin-bottom: 0.375rem;
   letter-spacing: -0.025em;
 }
 
 .page-header p {
-  color: #64748b;
+  color: var(--color-text-secondary);
   font-size: 0.938rem;
 }
 
@@ -302,20 +344,20 @@ body {
 }
 
 .stat-card {
-  background: white;
+  background: var(--color-surface);
   padding: 1.25rem;
   border-radius: 10px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   transition: all 0.2s ease;
 }
 
 .stat-card:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-card);
 }
 
 .stat-label {
-  color: #64748b;
+  color: var(--color-text-secondary);
   font-size: 0.875rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -326,7 +368,7 @@ body {
 .stat-value {
   font-size: 2.25rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-heading);
   letter-spacing: -0.025em;
 }
 
@@ -347,11 +389,12 @@ body {
 }
 
 .card {
-  background: white;
+  background: var(--color-surface);
   border-radius: 10px;
   padding: 1.25rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
   margin-bottom: 1.25rem;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .card-header {
@@ -360,13 +403,13 @@ body {
   align-items: center;
   margin-bottom: 1rem;
   padding-bottom: 0.875rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .card-title {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--color-text-heading);
   letter-spacing: -0.025em;
 }
 
@@ -380,16 +423,16 @@ table {
 }
 
 thead {
-  background: #f8fafc;
-  border-top: 1px solid #e2e8f0;
-  border-bottom: 1px solid #e2e8f0;
+  background: var(--color-thead-bg);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
 }
 
 th {
   text-align: left;
   padding: 0.5rem 0.75rem;
   font-weight: 600;
-  color: #475569;
+  color: var(--color-text-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -397,8 +440,8 @@ th {
 
 td {
   padding: 0.5rem 0.75rem;
-  border-top: 1px solid #f1f5f9;
-  color: #334155;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text);
   font-size: 0.875rem;
 }
 
@@ -407,7 +450,7 @@ tbody tr {
 }
 
 tbody tr:hover {
-  background: #f8fafc;
+  background: var(--color-table-row-hover);
 }
 
 .badge {
@@ -473,7 +516,7 @@ tbody tr:hover {
 .loading {
   text-align: center;
   padding: 3rem;
-  color: #64748b;
+  color: var(--color-text-secondary);
   font-size: 0.938rem;
 }
 
@@ -485,5 +528,11 @@ tbody tr:hover {
   border-radius: 8px;
   margin: 1rem 0;
   font-size: 0.938rem;
+}
+
+:root[data-theme="dark"] .error {
+  background: #3f1d1d;
+  border-color: #7f1d1d;
+  color: #fca5a5;
 }
 </style>
